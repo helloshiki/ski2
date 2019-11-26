@@ -1,0 +1,124 @@
+
+=============================================== ski.core ===============================================
+ski.run(func)   修改
+    ski.run(func, ...)  ==> void    # old
+    ski.run(func)       ==> thread  # new
+    取消...可选参数列表，新增返回值thread
+
+ski.go(func)    修改
+    ski.go(func, ...)  ==> void    # old
+    ski.go(func)       ==> thread  # new
+    取消...可选参数列表，新增返回值thread
+
+ski.time()      不变
+ski.sleep(num)  不变
+ski.yield()     不变
+ski.new_chan(num) 	删除!!!!!
+    可以使用wait/wakeup在业务层模拟
+
+ski.wait()  新增
+    ==> signals
+    让出CPU, 等待被唤醒．被唤醒时，返回被唤醒的原因: signals，可能有多个原因，每个原因用一个位表示．
+    所有的信号都可以唤醒此调用
+ski.wait_signals(signal, ...)   新增
+    ==> signals
+    让出CPU, 等待被唤醒．被唤醒时，返回被唤醒的原因: signals，可能有多个原因，每个原因用一个位表示
+    如果被唤醒的原因不在等待的信号列表中，ski.wait_signals将会在内部一直调用ski.wait()等待．
+ski.wakeup(thread, [signal])    新增
+    使用可选信息signal唤醒thread
+
+ski.set_name(thread, name) 新增
+    给thread设置name，用于debug
+ski.get_name(thread)    新增
+    ==> thread_name
+    获取thread name，用于debug
+ski.set_finalize(thread, cb)    新增
+    给thread设置释放前调用的回调函数，此时thread已经死亡，不会再被调度
+ski.status(thread)  新增
+    ==> dead, running, suspended, ...
+    获取thread的状态
+ski.millitime() 新增
+    ==> milliseconds
+    同ski.time()，但返回的是毫秒
+ski.sleepms(ms) 新增
+    同ski.sleep(n)，但休眠的单位是ms
+ski.sigusr1 新增
+    信号值，用户信号1
+ski.sigusr2 新增
+    信号值，用户信号2
+ski.sigkill 新增
+    信号值，中止信号．只是通知，并不强制中止thread，需要thread自行处理
+ski.iskill(signals)  新增
+    ==> bool
+    signals中是否包含sigkill
+ski.isusr1(signals)  新增
+    ==> bool
+    signals中是否包含sigusr1
+ski.isusr2(signals)  新增
+    ==> bool
+    signals中是否包含sigusr2
+ski.issignal(signals, target)   新增
+    ==> bool
+    signals中是否包含target
+
+================================================ ski.udp ==============================================
+udp.new()                   不变
+udp:set_broadcast(on)       不变
+udp::bind(host, port)       不变
+udp:close()                 不变
+udp:set_name(name)          新增
+    设置名字，debug使用
+udp:send(host, port, data)  修改
+    ==> true 或者 nil, err
+    使用wait_signals/wakeup改写，增加异常处理
+udp:recv()                 修改
+    ==> string 或者 nil, err
+    !!!!!取消v1.0中的timeout, recv(timeout)
+    使用wait_signals/wakeup改写，增加异常处理.
+    与v1.0类似，接收到的数据包会被缓存，如果业务不及时处理，将会导致内存用量一直增加
+
+================================================ ski.tcp ==============================================
+tcp.connect(host, port) 修改
+    ==> tcp_client 或者　nil, err
+    连接 host:port
+tcp.listen(host, port)  修改
+    ==> tcp_listener 或者　nil, err
+    监听 host:port
+listener:accept()       修改
+    ==> tcp_client 或者　nil, err
+    使用wait_signals/wakeup改写
+listener:close()        修改
+#tcp_client:read2()     !!!删除
+    tcp_client:read()代替
+tcp_client:close()      修改
+tcp_client:read([size]) !!!修改
+    ==> string 或者 nil, err
+    !!!!v1.0中，read(size, timeout), 删除timeout(没有被使用过)
+    不使用size，也就是tcp_client:read()时，收到至少一个字节或者error时返回，此时与v1.0的read2()作用一样
+    使用size，也就是tcp_client:read(size)时，收到至少size个字节或者error时返回
+    此方法相比v1.0进行了较大改动v1.0保证业务端处理速度，经常调用read_start/read_stop，可能会导致问题．
+    v2.0改简单了，只调用一次read_start，一直接收到error或者close, 收到的数据被缓存．与此同时，如果业务处理速度跟不上，会导致内存用量增加
+tcp_client:write(data)  修改
+    使用wait_signals/wakeup改写
+
+
+
+
+
+
+
+=================================　升级v2.0,代码改动　===================================
+1. ski.run/ski.go 取消了可选参数传递，原来的代码需要适配
+2. ski.new_chan 删除了，原来的代码要用 wait_signals/wakeup 改写
+3. udp:recv()   取消了timeout，原来的timeout失效．但用的地方只有一处，也没有影响
+4. tcp_client:read() 取消了timeout,原来的代码没有使用timeout，没有影响　
+
+
+
+
+
+
+
+
+
+
